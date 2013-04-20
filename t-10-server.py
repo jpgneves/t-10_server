@@ -66,7 +66,7 @@ class T10Server():
         return result['response']
 
     def wave(self, city):
-        '''Send a "wave" message to earth, so they can start waving to the ISS!'''
+        '''Send a "wave" message, so they can start waving to the ISS!'''
         try:
             for t in TIMERS[city]:
                 t.cancel()
@@ -74,7 +74,12 @@ class T10Server():
             pass
         finally:
             TIMERS[city] = []
-        SERVER.push_to_channel('earth', json.dumps({'location': city}))
+        if city == "iss":
+            #push to space instead :P
+            channel = 'space'
+        else:
+            channel = 'earth'
+        SERVER.push_to_channel(channel, json.dumps({'location': city}))
 
 
 class T10RequestHandler(BaseHTTPRequestHandler):
