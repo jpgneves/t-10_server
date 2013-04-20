@@ -1,10 +1,12 @@
 import SimpleHTTPServer
-from BaseHTTPServer import BaseHTTPRequestHandler
 import SocketServer
 import ephem
 import requests
 import json
 import string
+import threading
+from BaseHTTPServer import BaseHTTPRequestHandler
+from datetime import datetime, timedelta
 
 # It wouldn't be a hackathon without dirty hacks, right?
 PORT = 8000
@@ -20,22 +22,37 @@ class T10Server():
     '''"Server" for handling alerts, checking weather, what not.'''
     def __init__(self):
         self.iss_api = "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}"
-        self.weather_api = "http://api.worldweatheronline.com/free/v1/weather.ashx?q=%%location%%&format=json&date=today&key=jr7r87s8x3knpud3ehs5uzue"
+        self.weather_api = "http://api.worldweatheronline.com/free/v1/weather.ashx?q=%%location%%&format=json&date=today&key=jr7r87s8x3knpud3ehs5uzue" # Yep, API keys everywhere :(
 
     def get_cloud_cover(self, city):
+        '''Gets cloud cover in % for the given city'''
         r = requests.get(string.replace(self.weather_api, "%%location%%", city))
         result = json.loads(r.text)
         print result
         return result['data']['current_condition'][0]['cloudcover']
 
-    def get_next_passes(self, city, count):
+    def alert_next_passes(self, city, count):
         location = ephem.city(city)
         url = self.iss_api.format(to_decimal(location.lat), to_decimal(location.lon), int(location.elevation), count)
         print url
         r = requests.get(url)
         result = json.loads(r.text)
         next_passes = result['response']
-        return next_passes
+        # For every pass, set up a trigger for 15 minutes earlier and send it
+        # to the 'space' channel
+        for p in next_passes:
+            risetime = datetime.utcfromtimestamp(p['risetime'])
+            riseminus15 = risetime - timedelta(minutes=15)
+            delay = (riseminus15 - datetime.utcnow()).total_seconds()
+            #delay = 5
+            print "Running in {0} seconds...".format(delay)
+            def f():
+                cloud_cover = self.get_cloud_cover(city)
+                if float(cloud_cover) <= 0.3:
+                    print "Less than 30% cloud cover"
+                    SERVER.push_to_channel('space', json.dumps({'location': city, 'cloudcover': cloud_cover}))
+            threading.Timer(delay, f).start()
+        return result['response']
 
 
 class T10RequestHandler(BaseHTTPRequestHandler):
@@ -44,12 +61,15 @@ class T10RequestHandler(BaseHTTPRequestHandler):
         tokens = self.path.split('/')[1:]
         print tokens
         if len(tokens) >= 3 and tokens[0] == "subscribe":
+            # /subscribe/earth/ios/DEVICEID
             SERVER.subscribe_device(tokens[1], tokens[2], tokens[3])
-            SERVER.push_to_channel(tokens[1], "Foo!")
-            s = T10Server()
-            s.get_cloud_cover("London")
-            s.get_next_passes("London", 5)
-        self.send_response(200)
+            self.send_response(200)
+        elif len(tokens) >= 2 and tokens[0] == "add_event":
+            # /add_event/London
+            passes = T10Server().alert_next_passes(tokens[1], 5)
+            self.send_response(200, json.dumps(passes))
+        else:
+            self.send_response(418) # We're a teapot :D
 
 class ACSServer():
     '''Handles connections to Appcelerator Cloud Services and does push notifications'''
@@ -78,6 +98,7 @@ class ACSServer():
             r = requests.post(url, data=payload, cookies=self.cookies)
 
     def push_to_channel(self, channel, message):
+        print "Pushing {0} to {1}".format(message, channel)
         try:
             string_ids = ",".join(self.clients[channel])
         except KeyError:
