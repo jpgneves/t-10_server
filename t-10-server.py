@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 # It wouldn't be a hackathon without dirty hacks, right?
 PORT = 8000
 SERVER = None
+TIMERS = {} # {"London": [<Thread>], ...}
 
 def to_decimal(coord):
     tokens = str(coord).split(":")
@@ -32,6 +33,13 @@ class T10Server():
         return result['data']['current_condition'][0]['cloudcover']
 
     def alert_next_passes(self, city, count):
+        try:
+            for t in TIMERS[city]:
+                t.cancel()
+        except KeyError:
+            pass
+        finally:
+            TIMERS[city] = []
         location = ephem.city(city)
         url = self.iss_api.format(to_decimal(location.lat), to_decimal(location.lon), int(location.elevation), count)
         print url
@@ -51,8 +59,22 @@ class T10Server():
                 if float(cloud_cover) <= 0.3:
                     print "Less than 30% cloud cover"
                     SERVER.push_to_channel('space', json.dumps({'location': city, 'cloudcover': cloud_cover}))
-            threading.Timer(delay, f).start()
+            t = threading.Timer(delay, f)
+            TIMERS[city].append(t)
+            t.start()
+
         return result['response']
+
+    def wave(self, city):
+        '''Send a "wave" message to earth, so they can start waving to the ISS!'''
+        try:
+            for t in TIMERS[city]:
+                t.cancel()
+        except KeyError:
+            pass
+        finally:
+            TIMERS[city] = []
+        SERVER.push_to_channel('earth', json.dumps({'location': city}))
 
 
 class T10RequestHandler(BaseHTTPRequestHandler):
@@ -68,6 +90,10 @@ class T10RequestHandler(BaseHTTPRequestHandler):
             # /add_event/London
             passes = T10Server().alert_next_passes(tokens[1], 5)
             self.send_response(200, json.dumps(passes))
+        elif len(tokens) >= 2 and tokens[0] == "wave":
+            # /wave/London
+            T10Server().wave(tokens[1])
+            self.send_response(200)
         else:
             self.send_response(418) # We're a teapot :D
 
