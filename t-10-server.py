@@ -35,8 +35,7 @@ class T10Server():
         r = requests.get(url)
         result = json.loads(r.text)
         next_passes = result['response']
-        for p in next_passes:
-            print p
+        return next_passes
 
 
 class T10RequestHandler(BaseHTTPRequestHandler):
