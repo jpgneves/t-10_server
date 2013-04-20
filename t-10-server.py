@@ -1,23 +1,59 @@
 import SimpleHTTPServer
 from BaseHTTPServer import BaseHTTPRequestHandler
 import SocketServer
+import ephem
 import requests
 import json
+import string
 
 # It wouldn't be a hackathon without dirty hacks, right?
 PORT = 8000
 SERVER = None
 
-class T10RequestHandler(BaseHTTPRequestHandler):
+def to_decimal(coord):
+    tokens = str(coord).split(":")
+    r = abs(int(tokens[0])) + abs(int(tokens[1])/60.0) + abs(float(tokens[2])/3600.0)
+    print r
+    return r
 
+class T10Server():
+    '''"Server" for handling alerts, checking weather, what not.'''
+    def __init__(self):
+        self.iss_api = "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}"
+        self.weather_api = "http://api.worldweatheronline.com/free/v1/weather.ashx?q=%%location%%&format=json&date=today&key=jr7r87s8x3knpud3ehs5uzue"
+
+    def get_cloud_cover(self, city):
+        r = requests.get(string.replace(self.weather_api, "%%location%%", city))
+        result = json.loads(r.text)
+        print result
+        return result['data']['current_condition'][0]['cloudcover']
+
+    def get_next_passes(self, city, count):
+        location = ephem.city(city)
+        url = self.iss_api.format(to_decimal(location.lat), to_decimal(location.lon), int(location.elevation), count)
+        print url
+        r = requests.get(url)
+        result = json.loads(r.text)
+        next_passes = result['response']
+        for p in next_passes:
+            print p
+
+
+class T10RequestHandler(BaseHTTPRequestHandler):
+    '''Dirty quick request handler'''
     def do_POST(self):
         tokens = self.path.split('/')[1:]
         print tokens
         if len(tokens) >= 3 and tokens[0] == "subscribe":
-            SERVER.subscribe_device("general", tokens[1], tokens[2])
-        SERVER.push_to_channel("general", "Foo!")
+            SERVER.subscribe_device(tokens[1], tokens[2], tokens[3])
+            SERVER.push_to_channel(tokens[1], "Foo!")
+            s = T10Server()
+            s.get_cloud_cover("London")
+            s.get_next_passes("London", 5)
+        self.send_response(200)
 
 class ACSServer():
+    '''Handles connections to Appcelerator Cloud Services and does push notifications'''
     def __init__(self, user, password, key):
         self.key = key
         self.user = user
@@ -62,4 +98,3 @@ if __name__ == '__main__':
     SERVER = ACSServer("t10admin", "3Wd2EXRfQV", "mIuLKF9z8RCMJsYKPsl15nmfqCbSBdWZ")
 
     httpd.serve_forever()
-    #a.push_to_channel("general", "Hello!")
