@@ -14,12 +14,14 @@ SERVER = None
 TIMERS = {} # {"London": [<Thread>], ...}
 
 def to_decimal(coord):
+    '''Convert DDMMSS.SS to DD.MMSSSS'''
     tokens = str(coord).split(":")
     r = abs(int(tokens[0])) + abs(int(tokens[1])/60.0) + abs(float(tokens[2])/3600.0)
-    print r
+    #print r
     return r
 
 def get_nighttime(city):
+    '''Returns sunset and sunrise times for the given city'''
     now = datetime.utcnow()
     location = ephem.city(city)
     sun = ephem.Sun()
@@ -35,13 +37,13 @@ class T10Server():
     def get_cloud_cover(self, city, when='today'):
         '''Gets cloud cover in % for the given city'''
         url = self.weather_api.format(city, when)
-        print url
+        #print url
         r = requests.get(self.weather_api.format(city, when))
         try:
             result = json.loads(r.text)
         except ValueError:
             return '0' # We most likely went over quota for the free API
-        print result
+        #print result
         return result['data']['current_condition'][0]['cloudcover']
 
     def alert_next_passes(self, city, acc_cloud_cover, timeofday, device_id, count):
@@ -56,7 +58,7 @@ class T10Server():
             TIMERS[city] = []
         location = ephem.city(city)
         url = self.iss_api.format(to_decimal(location.lat), to_decimal(location.lon), int(location.elevation), count)
-        print url
+        #print url
         r = requests.get(url)
         result = json.loads(r.text)
         next_passes = result['response']
@@ -109,7 +111,7 @@ class T10RequestHandler(BaseHTTPRequestHandler):
     '''Dirty quick request handler'''
     def do_POST(self):
         tokens = self.path.split('/')[1:]
-        print tokens
+        #print tokens
         if len(tokens) >= 3 and tokens[0] == "subscribe":
             # /subscribe/earth/ios/DEVICEID
             SERVER.subscribe_device(tokens[1], tokens[2], tokens[3])
@@ -152,7 +154,7 @@ class ACSServer():
             self.clients[channel].append(device_id)
         except KeyError:
             self.clients[channel] = [device_id]
-            print self.clients
+            #print self.clients
         finally:
             url = "https://api.cloud.appcelerator.com/v1/push_notifications/subscribe.json?key=vjCQ6KRqplmkektlpbEjiDQ2nYReubkP"
             payload = {'type':device_type, 'device_id':device_id, 'channel':'channel'}
@@ -167,12 +169,10 @@ class ACSServer():
     def push_to_ids_at_channel(self, channel, ids, message):
         print "Pushing {0} to {1}".format(message, channel)
         string_ids = ",".join(ids)
-        print string_ids
         payload = {'channel':channel, 'to_ids':string_ids, 'payload':json.dumps({'badge':2, 'sound':'default', 'alert':message})}
         url = "https://api.cloud.appcelerator.com/v1/push_notification/notify.json?key=" + self.key
-        print url
+        #print url
         r = requests.post(url, data=payload, cookies=self.cookies)
-        print r.text
 
 
 if __name__ == '__main__':
