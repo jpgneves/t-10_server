@@ -70,8 +70,8 @@ class T10Server():
                 continue
             elif timeofday == 'day' and (risetime >= nighttime[0] or risetime <= nighttime[1]):
                 continue
-            riseminus15 = risetime - timedelta(minutes=10)
-            delay = (riseminus15 - datetime.utcnow()).total_seconds()
+            riseminus10 = risetime - timedelta(minutes=10)
+            delay = (riseminus10 - datetime.utcnow()).total_seconds()
             print "Running in {0} seconds...".format(delay)
             def f():
                 cloud_cover = self.get_cloud_cover(city)
@@ -82,9 +82,9 @@ class T10Server():
             TIMERS[city].append(t)
             t.start()
             cloud_forecast = self.get_cloud_cover(city, str(datetime.utcfromtimestamp(p['risetime']).date()))
-            real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': float(cloud_forecast)})
+            real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': float(cloud_forecast), 'trigger_time': str(riseminus10)})
 
-        return json.dumps(real_response)
+        return real_response
 
     def wave(self, city):
         '''Send a "wave" message, so they can start waving to the ISS!'''
@@ -115,7 +115,7 @@ class T10RequestHandler(BaseHTTPRequestHandler):
             message = "ok"
         elif len(tokens) >= 4 and tokens[0] == "add_event":
             # /add_event/London/CLOUDCOVER/TIMEOFDAY/DEVICEID
-            passes = T10Server().alert_next_passes(tokens[1], tokens[2], tokens[3], tokens[4], 5)
+            passes = T10Server().alert_next_passes(tokens[1], tokens[2], tokens[3], tokens[4], 10)
             self.send_response(200)
             message = json.dumps(passes)
         elif len(tokens) >= 2 and tokens[0] == "wave":
