@@ -45,7 +45,9 @@ class T10Server():
         return result['data']['current_condition'][0]['cloudcover']
 
     def alert_next_passes(self, city, acc_cloud_cover, timeofday, device_id, count):
+        '''Sets up alerts for up to the next 10 passes of the ISS over the given city. Alerts will be sent to the device that registered for them'''
         try:
+            # Cancel previous timers.
             for t in TIMERS[city]:
                 t.cancel()
         except KeyError:
