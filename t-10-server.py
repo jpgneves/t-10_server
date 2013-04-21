@@ -19,20 +19,32 @@ def to_decimal(coord):
     print r
     return r
 
+def get_nighttime(city):
+    now = datetime.utcnow()
+    location = ephem.city(city)
+    sun = ephem.Sun()
+    location.date = now
+    return (location.next_setting(sun).datetime(), location.next_rising(sun).datetime())
+
 class T10Server():
     '''"Server" for handling alerts, checking weather, what not.'''
     def __init__(self):
         self.iss_api = "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}"
-        self.weather_api = "http://api.worldweatheronline.com/free/v1/weather.ashx?q=%%location%%&format=json&date=today&key=jr7r87s8x3knpud3ehs5uzue" # Yep, API keys everywhere :(
+        self.weather_api = "http://api.worldweatheronline.com/free/v1/weather.ashx?q={0}&format=json&date={1}&key=jr7r87s8x3knpud3ehs5uzue" # Yep, API keys everywhere :(
 
-    def get_cloud_cover(self, city):
+    def get_cloud_cover(self, city, when='today'):
         '''Gets cloud cover in % for the given city'''
-        r = requests.get(string.replace(self.weather_api, "%%location%%", city))
-        result = json.loads(r.text)
+        url = self.weather_api.format(city, when)
+        print url
+        r = requests.get(self.weather_api.format(city, when))
+        try:
+            result = json.loads(r.text)
+        except ValueError:
+            return '0' # We most likely went over quota for the free API
         print result
         return result['data']['current_condition'][0]['cloudcover']
 
-    def alert_next_passes(self, city, count):
+    def alert_next_passes(self, city, acc_cloud_cover, timeofday, device_id, count):
         try:
             for t in TIMERS[city]:
                 t.cancel()
@@ -46,24 +58,33 @@ class T10Server():
         r = requests.get(url)
         result = json.loads(r.text)
         next_passes = result['response']
-        # For every pass, set up a trigger for 15 minutes earlier and send it
+        # For every pass, set up a trigger for 10 minutes earlier and send it
         # to the 'space' channel
+        real_response = []
         for p in next_passes:
             risetime = datetime.utcfromtimestamp(p['risetime'])
-            riseminus15 = risetime - timedelta(minutes=15)
+            nighttime = get_nighttime(city)
+            print timeofday, risetime, nighttime[0], nighttime[1]
+            # Skip if the pass is at the wrong time of day
+            if timeofday == 'night' and (risetime < nighttime[0] or risetime > nighttime[1]):
+                continue
+            elif timeofday == 'day' and (risetime >= nighttime[0] or risetime <= nighttime[1]):
+                continue
+            riseminus15 = risetime - timedelta(minutes=10)
             delay = (riseminus15 - datetime.utcnow()).total_seconds()
-            #delay = 5
             print "Running in {0} seconds...".format(delay)
             def f():
                 cloud_cover = self.get_cloud_cover(city)
-                if float(cloud_cover) <= 0.3:
-                    print "Less than 30% cloud cover"
-                    SERVER.push_to_channel('space', json.dumps({'location': city, 'cloudcover': cloud_cover}))
+                if float(cloud_cover) <= float(acc_cloud_cover):
+                    print "Cloud cover acceptable"
+                    SERVER.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'cloudcover': cloud_cover}))
             t = threading.Timer(delay, f)
             TIMERS[city].append(t)
             t.start()
+            cloud_forecast = self.get_cloud_cover(city, str(datetime.utcfromtimestamp(p['risetime']).date()))
+            real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': float(cloud_forecast)})
 
-        return result['response']
+        return json.dumps(real_response)
 
     def wave(self, city):
         '''Send a "wave" message, so they can start waving to the ISS!'''
@@ -91,16 +112,23 @@ class T10RequestHandler(BaseHTTPRequestHandler):
             # /subscribe/earth/ios/DEVICEID
             SERVER.subscribe_device(tokens[1], tokens[2], tokens[3])
             self.send_response(200)
-        elif len(tokens) >= 2 and tokens[0] == "add_event":
-            # /add_event/London
-            passes = T10Server().alert_next_passes(tokens[1], 5)
-            self.send_response(200, json.dumps(passes))
+            message = "ok"
+        elif len(tokens) >= 4 and tokens[0] == "add_event":
+            # /add_event/London/CLOUDCOVER/TIMEOFDAY/DEVICEID
+            passes = T10Server().alert_next_passes(tokens[1], tokens[2], tokens[3], tokens[4], 5)
+            self.send_response(200)
+            message = json.dumps(passes)
         elif len(tokens) >= 2 and tokens[0] == "wave":
             # /wave/London
             T10Server().wave(tokens[1])
             self.send_response(200)
+            message = "ok"
         else:
             self.send_response(418) # We're a teapot :D
+            message = "I'm a teapot"
+        self.end_headers()
+        self.wfile.write(message)
+        return
 
 class ACSServer():
     '''Handles connections to Appcelerator Cloud Services and does push notifications'''
@@ -129,11 +157,14 @@ class ACSServer():
             r = requests.post(url, data=payload, cookies=self.cookies)
 
     def push_to_channel(self, channel, message):
-        print "Pushing {0} to {1}".format(message, channel)
         try:
-            string_ids = ",".join(self.clients[channel])
+            self.push_to_ids_at_channel(channel, self.clients[channel], message)
         except KeyError:
             return
+
+    def push_to_ids_at_channel(self, channel, ids, message):
+        print "Pushing {0} to {1}".format(message, channel)
+        string_ids = ",".join(ids)
         print string_ids
         payload = {'channel':channel, 'to_ids':string_ids, 'payload':json.dumps({'badge':2, 'sound':'default', 'alert':message})}
         url = "https://api.cloud.appcelerator.com/v1/push_notification/notify.json?key=" + self.key
