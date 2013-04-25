@@ -48,7 +48,21 @@ class Alert(Resource):
     def delete(self, alert_id):
         return {'response': 'ok'}
 
+class Wave(Resource):
+    def post(self, alert_id=None):
+        if alert_id is None:
+            self.do_wave_back()
+        else:
+            self.do_wave_start(alert_id)
+
+    def do_wave_start(self):
+        pass
+
+    def do_wave_back(self):
+        pass
+
 api.add_resource(Alert, '/alerts', '/alerts/<int:alert_id>')
+api.add_resource(Wave, '/alerts/wave/start/<int:alert_id>', '/alerts/wave/back')
 
 #@app.route('/login')
 #def login():
