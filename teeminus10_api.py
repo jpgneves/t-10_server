@@ -26,10 +26,10 @@ api = restful.Api(app)
 #    consumer_secret='<your secret here>'
 #)
 
-t10_helper = T10Helper()
 config = ConfigParser()
 config.read("teeminus10.config")
 acs_helper = T10ACSHelper(config.get('ACS', 'user'), config.get('ACS', 'password'), config.get('ACS', 'key'))
+t10_helper = T10Helper(acs_helper)
 
 class Alert(Resource):
     def get(self):

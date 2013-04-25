@@ -63,6 +63,9 @@ class WeatherData():
 
 class T10Helper():
     '''"Server" for handling alerts, checking weather, what not.'''
+    def __init__(self, acs):
+        self.acs = acs
+
     def get_cloud_cover(self, city):
         '''Gets cloud cover in % for the given city'''
         url = API_URLS['weather']['city_search'].format(city)
@@ -111,7 +114,7 @@ class T10Helper():
                 cloud_cover = weather_data.cloud_cover()
                 if cloud_cover <= acc_cloud_cover:
                     print "Cloud cover acceptable"
-                    SERVER.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'cloudcover': cloud_cover}))
+                    self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'cloudcover': cloud_cover}))
             t = threading.Timer(delay, f)
             TIMERS[city].append(t)
             t.start()
