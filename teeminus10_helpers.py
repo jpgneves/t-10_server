@@ -1,17 +1,19 @@
-import SimpleHTTPServer
-import SocketServer
 import ephem
-import requests
 import json
-import string
-import threading
-from BaseHTTPServer import BaseHTTPRequestHandler
-from datetime import datetime, timedelta
+import requests
+from datetime import datetime
 
-# It wouldn't be a hackathon without dirty hacks, right?
-PORT = 8000
-SERVER = None
-TIMERS = {} # {"London": [<Thread>], ...}
+API_URLS = { 'iss': "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}",
+             'weather': {'city_search': "http://api.openweathermap.org/data/2.5/weather?q={0}",
+                         'coord_search': "http://api.openweathermap.org/data/2.5/weather?lat={0}&lon={1}" }
+         }
+
+ACS_URLS = { 'notify': "https://api.cloud.appcelerator.com/v1/push_notification/notify.json?key={0}",
+             'login': "https://api.cloud.appcelerator.com/v1/users/login.json?key={0}",
+             'subscribe': "https://api.cloud.appcelerator.com/v1/push_notifications/subscribe.json?key={0}"
+         }
+
+TIMERS = {}
 
 def to_decimal(coord):
     '''Convert DDMMSS.SS to DD.MMSSSS'''
@@ -28,22 +30,17 @@ def get_nighttime(city):
     location.date = now
     return (location.next_setting(sun).datetime(), location.next_rising(sun).datetime())
 
-class T10Server():
+class T10Helper():
     '''"Server" for handling alerts, checking weather, what not.'''
-    def __init__(self):
-        self.iss_api = "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}"
-        self.weather_api = "http://api.worldweatheronline.com/free/v1/weather.ashx?q={0}&format=json&date={1}&key=jr7r87s8x3knpud3ehs5uzue" # Yep, API keys everywhere :(
-
-    def get_cloud_cover(self, city, when='today'):
+    def get_cloud_cover(self, city):
         '''Gets cloud cover in % for the given city'''
-        url = self.weather_api.format(city, when)
-        #print url
-        r = requests.get(self.weather_api.format(city, when))
+        url = API_URLS['weather']['city_search'].format(city)
+        print url
+        r = requests.get(url)
         try:
             result = json.loads(r.text)
         except ValueError:
-            return '0' # We most likely went over quota for the free API
-        #print result
+            return '0'
         return result['data']['current_condition'][0]['cloudcover']
 
     def alert_next_passes(self, city, acc_cloud_cover, timeofday, device_id, count):
@@ -57,7 +54,7 @@ class T10Server():
         finally:
             TIMERS[city] = []
         location = ephem.city(city)
-        url = self.iss_api.format(to_decimal(location.lat), to_decimal(location.lon), int(location.elevation), count)
+        url = API_URLS['iss'].format(to_decimal(location.lat), to_decimal(location.lon), int(location.elevation), count)
         #print url
         r = requests.get(url)
         result = json.loads(r.text)
@@ -90,51 +87,7 @@ class T10Server():
 
         return real_response
 
-    def wave(self, city):
-        '''Send a "wave" message, so they can start waving to the ISS!'''
-        try:
-            for t in TIMERS[city]:
-                t.cancel()
-        except KeyError:
-            pass
-        finally:
-            TIMERS[city] = []
-        if city == "iss":
-            #push to space instead :P
-            channel = 'space'
-        else:
-            channel = 'earth'
-        SERVER.push_to_channel(channel, json.dumps({'location': city}))
-
-
-class T10RequestHandler(BaseHTTPRequestHandler):
-    '''Dirty quick request handler'''
-    def do_POST(self):
-        tokens = self.path.split('/')[1:]
-        #print tokens
-        if len(tokens) >= 3 and tokens[0] == "subscribe":
-            # /subscribe/earth/ios/DEVICEID
-            SERVER.subscribe_device(tokens[1], tokens[2], tokens[3])
-            self.send_response(200)
-            message = "ok"
-        elif len(tokens) >= 4 and tokens[0] == "add_event":
-            # /add_event/London/CLOUDCOVER/TIMEOFDAY/DEVICEID
-            passes = T10Server().alert_next_passes(tokens[1], tokens[2], tokens[3], tokens[4], 10)
-            self.send_response(200)
-            message = json.dumps(passes)
-        elif len(tokens) >= 2 and tokens[0] == "wave":
-            # /wave/London
-            T10Server().wave(tokens[1])
-            self.send_response(200)
-            message = "ok"
-        else:
-            self.send_response(418) # We're a teapot :D
-            message = "I'm a teapot"
-        self.end_headers()
-        self.wfile.write(message)
-        return
-
-class ACSServer():
+class T10ACSHelper():
     '''Handles connections to Appcelerator Cloud Services and does push notifications'''
     def __init__(self, user, password, key):
         self.key = key
@@ -146,7 +99,7 @@ class ACSServer():
     def __login(self):
         '''Need to login to appcelerator'''
         payload = {'login':self.user, 'password':self.password}
-        r = requests.post("https://api.cloud.appcelerator.com/v1/users/login.json?key=" + self.key, data=payload)
+        r = requests.post(ACS_URLS['login'].format(self.key), data=payload)
         self.cookies = r.cookies
 
     def subscribe_device(self, channel, device_type, device_id):
@@ -156,7 +109,7 @@ class ACSServer():
             self.clients[channel] = [device_id]
             #print self.clients
         finally:
-            url = "https://api.cloud.appcelerator.com/v1/push_notifications/subscribe.json?key=vjCQ6KRqplmkektlpbEjiDQ2nYReubkP"
+            url = ACS_URLS['subscribe'].format(self.key)
             payload = {'type':device_type, 'device_id':device_id, 'channel':'channel'}
             r = requests.post(url, data=payload, cookies=self.cookies)
 
@@ -170,15 +123,6 @@ class ACSServer():
         print "Pushing {0} to {1}".format(message, channel)
         string_ids = ",".join(ids)
         payload = {'channel':channel, 'to_ids':string_ids, 'payload':json.dumps({'badge':2, 'sound':'default', 'alert':message})}
-        url = "https://api.cloud.appcelerator.com/v1/push_notification/notify.json?key=" + self.key
+        url = ACS_URLS['notify'].format(self.key)
         #print url
         r = requests.post(url, data=payload, cookies=self.cookies)
-
-
-if __name__ == '__main__':
-    handler = T10RequestHandler
-    httpd = SocketServer.TCPServer(("", PORT), handler)
-
-    SERVER = ACSServer("t10admin", "3Wd2EXRfQV", "mIuLKF9z8RCMJsYKPsl15nmfqCbSBdWZ")
-
-    httpd.serve_forever()
