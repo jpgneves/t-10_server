@@ -1,11 +1,14 @@
 import ephem
 import json
 import requests
-from datetime import datetime
+import threading
+from datetime import datetime, timedelta
 
 API_URLS = { 'iss': "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}",
-             'weather': {'city_search': "http://api.openweathermap.org/data/2.5/weather?q={0}",
-                         'coord_search': "http://api.openweathermap.org/data/2.5/weather?lat={0}&lon={1}" }
+             'weather': {'city_now': "http://api.openweathermap.org/data/2.5/weather?q={0}",
+                         'coord_now': "http://api.openweathermap.org/data/2.5/weather?lat={0}&lon={1}",
+                         'city_forecast': "http://api.openweathermap.org/data/2.5/forecast?q={0}"
+                     }
          }
 
 ACS_URLS = { 'notify': "https://api.cloud.appcelerator.com/v1/push_notification/notify.json?key={0}",
@@ -22,13 +25,41 @@ def to_decimal(coord):
     #print r
     return r
 
-def get_nighttime(city):
-    '''Returns sunset and sunrise times for the given city'''
-    now = datetime.utcnow()
+def get_nighttime(city, date):
+    '''Returns sunset and sunrise times for the given city at date'''
     location = ephem.city(city)
     sun = ephem.Sun()
-    location.date = now
+    location.date = date.date()
     return (location.next_setting(sun).datetime(), location.next_rising(sun).datetime())
+
+class WeatherData():
+    def __init__(self, city):
+        self.city = city
+
+    def __do_get(self, url):
+        r = requests.get(url)
+        try:
+            return json.loads(r.text)
+        except ValueError:
+            return {} # Something went wrong!
+
+    def current_cloud_cover(self):
+        url = API_URLS['weather']['city_now'].format(self.city)
+        data = self.__do_get(url)
+        return data['clouds']['all']
+
+    def cloud_forecast(self, date):
+        url = API_URLS['weather']['city_forecast'].format(self.city)
+        data = self.__do_get(url)
+        forecast = data['list']
+        least_diff = 9999999999999
+        closest_forecast = None
+        for f in forecast:
+            time_diff = (date - datetime.utcfromtimestamp(f['dt'])).total_seconds()
+            if abs(time_diff) < least_diff:
+                least_diff = time_diff
+                closest_forecast = f
+        return closest_forecast['clouds']['all']
 
 class T10Helper():
     '''"Server" for handling alerts, checking weather, what not.'''
@@ -64,26 +95,29 @@ class T10Helper():
         real_response = []
         for p in next_passes:
             risetime = datetime.utcfromtimestamp(p['risetime'])
-            nighttime = get_nighttime(city)
-            print timeofday, risetime, nighttime[0], nighttime[1]
+            weather_data = WeatherData(city)
+            night_time = get_nighttime(city, risetime)
             # Skip if the pass is at the wrong time of day
-            if timeofday == 'night' and (risetime < nighttime[0] or risetime > nighttime[1]):
+            if timeofday == 'night' and not (night_time[0] < risetime < night_time[1]):
+                print "{0} < {1} < {2} = {3}".format(night_time[0], risetime, night_time[1], (night_time[0] < risetime < night_time[1]))
                 continue
-            elif timeofday == 'day' and (risetime >= nighttime[0] or risetime <= nighttime[1]):
+            elif timeofday == 'day' and not (night_time[1] <= risetime <= night_time[0]):
                 continue
             riseminus10 = risetime - timedelta(minutes=10)
             delay = (riseminus10 - datetime.utcnow()).total_seconds()
             print "Running in {0} seconds...".format(delay)
             def f():
-                cloud_cover = self.get_cloud_cover(city)
-                if float(cloud_cover) <= float(acc_cloud_cover):
+                weather_data = WeatherData(city)
+                cloud_cover = weather_data.cloud_cover()
+                if cloud_cover <= acc_cloud_cover:
                     print "Cloud cover acceptable"
                     SERVER.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'cloudcover': cloud_cover}))
             t = threading.Timer(delay, f)
             TIMERS[city].append(t)
             t.start()
-            cloud_forecast = self.get_cloud_cover(city, str(datetime.utcfromtimestamp(p['risetime']).date()))
+            cloud_forecast = weather_data.cloud_forecast(datetime.utcfromtimestamp(p['risetime']))
             real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': float(cloud_forecast), 'trigger_time': str(riseminus10)})
+            print real_response
 
         return real_response
 

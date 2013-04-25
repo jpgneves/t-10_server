@@ -33,8 +33,7 @@ acs_helper = T10ACSHelper(config.get('ACS', 'user'), config.get('ACS', 'password
 
 class Alert(Resource):
     def get(self):
-        print request.headers
-        return {'response': [{'id': 3}]}
+        return {'response': []}
     def put(self):
         data = request.json
         if data is not None:
@@ -43,7 +42,9 @@ class Alert(Resource):
             except KeyError:
                 city = "Stockholm" # Default while I don't fix this.
             finally:
-                return {'response': t10_helper.alert_next_passes(city, data['max_cloud_cover'], data['time_of_day'], "foo", 10)}
+                next_passes = t10_helper.alert_next_passes(city, data['max_cloud_cover'], data['time_of_day'], "foo", 10)
+                print next_passes
+                return {'response': next_passes}
     def delete(self, alert_id):
         return {'response': 'ok'}
 
