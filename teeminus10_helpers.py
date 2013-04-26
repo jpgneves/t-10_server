@@ -46,7 +46,7 @@ class WeatherData():
     def current_cloud_cover(self):
         url = API_URLS['weather']['city_now'].format(self.city)
         data = self.__do_get(url)
-        return data['clouds']['all']
+        return data['clouds']['all'] / 100.0
 
     def cloud_forecast(self, date):
         url = API_URLS['weather']['city_forecast'].format(self.city)
@@ -59,7 +59,7 @@ class WeatherData():
             if abs(time_diff) < least_diff:
                 least_diff = time_diff
                 closest_forecast = f
-        return closest_forecast['clouds']['all']
+        return closest_forecast['clouds']['all'] / 100.0
 
 class T10Helper():
     '''"Server" for handling alerts, checking weather, what not.'''
@@ -102,7 +102,6 @@ class T10Helper():
             night_time = get_nighttime(city, risetime)
             # Skip if the pass is at the wrong time of day
             if timeofday == 'night' and not (night_time[0] < risetime < night_time[1]):
-                print "{0} < {1} < {2} = {3}".format(night_time[0], risetime, night_time[1], (night_time[0] < risetime < night_time[1]))
                 continue
             elif timeofday == 'day' and not (night_time[1] <= risetime <= night_time[0]):
                 continue
@@ -119,7 +118,7 @@ class T10Helper():
             TIMERS[city].append(t)
             t.start()
             cloud_forecast = weather_data.cloud_forecast(datetime.utcfromtimestamp(p['risetime']))
-            real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': float(cloud_forecast), 'trigger_time': str(riseminus10)})
+            real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': cloud_forecast, 'trigger_time': str(riseminus10)})
             print real_response
 
         return real_response
