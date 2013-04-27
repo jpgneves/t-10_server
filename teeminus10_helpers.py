@@ -117,7 +117,7 @@ class T10Helper():
             print "Running in {0} seconds...".format(delay)
             def f():
                 weather_data = WeatherData(city)
-                cloud_cover = weather_data.cloud_cover()
+                cloud_cover = weather_data.current_cloud_cover()
                 if cloud_cover <= acc_cloud_cover:
                     print "Cloud cover acceptable"
                     self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'cloudcover': cloud_cover}))
