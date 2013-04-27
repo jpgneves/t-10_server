@@ -25,12 +25,22 @@ def to_decimal(coord):
     #print r
     return r
 
-def get_nighttime(city, date):
+def in_time_of_day(city, pass_time, time_of_day):
     '''Returns sunset and sunrise times for the given city at date'''
     location = ephem.city(city)
+    location.date = pass_time
     sun = ephem.Sun()
-    location.date = date.date()
-    return (location.next_setting(sun).datetime(), location.next_rising(sun).datetime())
+    if time_of_day == "day":
+        previous_rising = location.previous_rising(sun).datetime()
+        next_setting = location.next_setting(sun, start=pass_time.date()).datetime()
+        return previous_rising.date() == pass_time.date() and pass_time <= next_setting
+    elif time_of_day == "night":
+        previous_rising = location.previous_rising(sun).datetime()
+        previous_setting = location.previous_setting(sun).datetime()
+        next_rising = location.next_rising(sun).datetime()
+        return (previous_setting.date() == pass_time.date() and pass_time <= next_rising) or (next_rising.date() == pass_time.date() and pass_time <= next_rising)
+    else:
+        return True
 
 class WeatherData():
     def __init__(self, city):
@@ -99,11 +109,8 @@ class T10Helper():
         for p in next_passes:
             risetime = datetime.utcfromtimestamp(p['risetime'])
             weather_data = WeatherData(city)
-            night_time = get_nighttime(city, risetime)
             # Skip if the pass is at the wrong time of day
-            if timeofday == 'night' and not (night_time[0] < risetime < night_time[1]):
-                continue
-            elif timeofday == 'day' and not (night_time[1] <= risetime <= night_time[0]):
+            if not in_time_of_day(city, risetime, timeofday):
                 continue
             riseminus10 = risetime - timedelta(minutes=10)
             delay = (riseminus10 - datetime.utcnow()).total_seconds()
@@ -119,8 +126,8 @@ class T10Helper():
             t.start()
             cloud_forecast = weather_data.cloud_forecast(datetime.utcfromtimestamp(p['risetime']))
             real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': cloud_forecast, 'trigger_time': str(riseminus10)})
-            print real_response
-
+            #print real_response
+        print "Length:", len(real_response)
         return real_response
 
 class T10ACSHelper():
