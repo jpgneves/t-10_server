@@ -83,7 +83,7 @@ class T10Helper():
         return result['data']['current_condition'][0]['cloudcover']
 
 
-    def get_next_visible_passes(self, lat, lon, altitude, count):
+    def get_next_passes(self, lat, lon, altitude, count, force_visible=False):
         '''Returns a list of the next visible passes for the ISS'''
 
         tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text # Do not scrape all the time for release!
@@ -109,7 +109,7 @@ class T10Helper():
 	    dt = datetime(year, month, day, hour, minute, int(second))
             location.date = tr
             iss.compute(location)
-            if not iss.eclipsed:
+            if not (force_visible and iss.eclipsed):
                 passes.append({"risetime": timegm(dt.timetuple()), "duration": duration})
             location.date = tr + 25 * ephem.minute
 
