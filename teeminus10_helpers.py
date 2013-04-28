@@ -2,7 +2,9 @@ import ephem
 import json
 import requests
 import threading
+from calendar import timegm
 from datetime import datetime, timedelta
+from math import degrees
 
 API_URLS = { 'iss': "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}",
              'weather': {'city_now': "http://api.openweathermap.org/data/2.5/weather?q={0}",
@@ -17,13 +19,6 @@ ACS_URLS = { 'notify': "https://api.cloud.appcelerator.com/v1/push_notification/
          }
 
 TIMERS = {}
-
-def to_decimal(coord):
-    '''Convert DDMMSS.SS to DD.MMSSSS'''
-    tokens = str(coord).split(":")
-    r = abs(int(tokens[0])) + abs(int(tokens[1])/60.0) + abs(float(tokens[2])/3600.0)
-    #print r
-    return r
 
 def in_time_of_day(city, pass_time, time_of_day):
     '''Returns sunset and sunrise times for the given city at date'''
@@ -87,8 +82,55 @@ class T10Helper():
             return '0'
         return result['data']['current_condition'][0]['cloudcover']
 
-    def alert_next_passes(self, city, acc_cloud_cover, timeofday, device_id, count):
-        '''Sets up alerts for up to the next 10 passes of the ISS over the given city. Alerts will be sent to the device that registered for them'''
+
+    def get_next_visible_passes(self, lat, lon, altitude, count):
+        '''Returns a list of the next visible passes for the ISS'''
+
+        tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text # Do not scrape all the time for release!
+        iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
+
+        iss = ephem.readtle(*iss_tle)
+
+        location = ephem.Observer()
+        location.lat = str(lat)
+        location.long = str(lon)
+        location.elevation = altitude
+
+        # Ignore effects of atmospheric refraction
+        location.pressure = 0
+        location.horizon = '5:00'
+
+        location.date = datetime.utcnow()
+        passes = []
+        for p in xrange(count):
+            tr, azr, tt, altt, ts, azs = location.next_pass(iss)
+            duration = int((ts - tr) * 60 * 60 * 24)
+            year, month, day, hour, minute, second = tr.tuple()
+	    dt = datetime(year, month, day, hour, minute, int(second))
+            location.date = tr
+            iss.compute(location)
+            if not iss.eclipsed:
+                passes.append({"risetime": timegm(dt.timetuple()), "duration": duration})
+            location.date = tr + 25 * ephem.minute
+
+        return {"response": passes }
+
+    def get_current_iss_location(self):
+        '''Returns the current ISS location'''
+        tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text # Do not scrape all the time for release!
+        iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
+
+        iss = ephem.readtle(*iss_tle)
+
+        now = datetime.utcnow()
+        iss.compute(now)
+        lon = degrees(iss.sublong)
+        lat = degrees(iss.sublat)
+
+        return {'response': {'latitude': lat, 'longitude': lon}}
+
+    def alert_next_passes(self, acc_cloud_cover, timeofday, device_id, count=10, city=None, coord=(0.0, 0.0)):
+        '''Sets up alerts for up to the next 10 passes of the ISS over the given city or lat/lon. Alerts will be sent to the device that registered for them'''
         try:
             # Cancel previous timers.
             for t in TIMERS[city]:
@@ -98,10 +140,11 @@ class T10Helper():
         finally:
             TIMERS[city] = []
         location = ephem.city(city)
-        url = API_URLS['iss'].format(to_decimal(location.lat), to_decimal(location.lon), int(location.elevation), count)
+        url = API_URLS['iss'].format(degrees(location.lat), degrees(location.lon), int(location.elevation), count)
         #print url
-        r = requests.get(url)
-        result = json.loads(r.text)
+        #r = requests.get(url)
+        #result = json.loads(r.text)
+        result = self.get_next_visible_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count)
         next_passes = result['response']
         # For every pass, set up a trigger for 10 minutes earlier and send it
         # to the 'space' channel

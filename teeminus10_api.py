@@ -39,10 +39,13 @@ class Alert(Resource):
         if data is not None:
             try:
                 city = data['location']['city']
+                coord = (0.0, 0.0)
             except KeyError:
-                city = "Stockholm" # Default while I don't fix this.
+                city = None
+                coord = (data['location']['latitude'], data['location']['longitude'])
             finally:
-                next_passes = t10_helper.alert_next_passes(city, data['max_cloud_cover'], data['time_of_day'], "foo", 10)
+                device_id = data['device_id']
+                next_passes = t10_helper.alert_next_passes(data['max_cloud_cover'], data['time_of_day'], "foo", city=city, coord=coord)
                 print next_passes
                 return {'response': next_passes}
     def delete(self, alert_id):
@@ -61,6 +64,24 @@ class Wave(Resource):
     def do_wave_back(self):
         pass
 
+class ISSPass(Resource):
+    def get(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('lat', type=float, default=0.0)
+        parser.add_argument('lon', type=float, default=0.0)
+        parser.add_argument('alt', type=int, default=0)
+        parser.add_argument('count', type=int, default=10)
+
+        args = parser.parse_args()
+
+        return t10_helper.get_next_visible_passes(args['lat'], args['lon'], args['alt'], args['count'])
+
+class ISSLocation(Resource):
+    def get(self):
+        return t10_helper.get_current_iss_location()
+
+api.add_resource(ISSLocation, '/location')
+api.add_resource(ISSPass, '/passes')
 api.add_resource(Alert, '/alerts', '/alerts/<int:alert_id>')
 api.add_resource(Wave, '/alerts/wave/start/<int:alert_id>', '/alerts/wave/back')
 
