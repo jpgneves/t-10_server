@@ -110,7 +110,7 @@ class T10Helper():
             location.date = tr
             iss.compute(location)
             if not (force_visible and iss.eclipsed):
-                passes.append({"risetime": timegm(dt.timetuple()), "duration": duration, "azimuth": azr.degrees(), "altitude": altt})
+                passes.append({"risetime": timegm(dt.timetuple()), "duration": duration, "azimuth": ephem.degrees(azr), "altitude": ephem.degrees(altt)})
             location.date = tr + 25 * ephem.minute
 
         return {"response": passes }
