@@ -74,7 +74,7 @@ class ISSPass(Resource):
 
         args = parser.parse_args()
 
-        return t10_helper.get_next_visible_passes(args['lat'], args['lon'], args['alt'], args['count'], True)
+        return t10_helper.get_next_passes(args['lat'], args['lon'], args['alt'], args['count'], True)
 
 class ISSLocation(Resource):
     def get(self):
