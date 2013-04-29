@@ -7,7 +7,7 @@ from flask.ext.restful import reqparse, abort, Api, Resource
 import flask.ext.restful as restful
 import json
 import types
-from ConfigParser import ConfigParser
+from ConfigParser import SafeConfigParser
 from teeminus10_helpers import T10Helper, T10ACSHelper
 
 app = Flask("T-10")
@@ -26,7 +26,7 @@ api = restful.Api(app)
 #    consumer_secret='<your secret here>'
 #)
 
-config = ConfigParser()
+config = SafeConfigParser({'host': '0.0.0.0', 'port': '5000', 'debug': 'False'})
 config.read("teeminus10.config")
 acs_helper = T10ACSHelper(config.get('ACS', 'user'), config.get('ACS', 'password'), config.get('ACS', 'key'))
 t10_helper = T10Helper(acs_helper)
@@ -91,4 +91,7 @@ api.add_resource(Wave, '/alerts/wave/start/<int:alert_id>', '/alerts/wave/back')
 #        return redirect('/')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    host = config.get('TeeMinus10', 'host')
+    port = int(config.get('TeeMinus10', 'port'))
+    debug = bool(config.get('TeeMinus10', 'debug'))
+    app.run(host=host, port=port, debug=debug)
