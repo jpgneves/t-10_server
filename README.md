@@ -9,5 +9,15 @@ Project by Kate Arkless Gray (@SpaceKate), João Neves (@jpgneves), Ketan Majmud
 
 Follow us on @TeeMinus10
 
-Weather data provided by: openweathermap.org
-ISS location data provided by: open-notify.org
+Weather data provided by: http://openweathermap.org
+
+ISS location data provided by: http://open-notify.org and Celestrak (http://celestrak.net)
+
+How to use
+==========
+Set up a Python virtualenv and then run the following from the t-10_server directory:
+
+  $ pip install -r requirements.txt
+  $ python ./teeminus10_api.py
+
+You can configure options (hostname, port) by editing the teeminus10.config file.
