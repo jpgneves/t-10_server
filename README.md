@@ -17,7 +17,7 @@ How to use
 ==========
 Set up a Python virtualenv and then run the following from the t-10_server directory:
 
-  $ pip install -r requirements.txt
-  $ python ./teeminus10_api.py
+    $ pip install -r requirements.txt
+    $ python ./teeminus10_api.py
 
 You can configure options (hostname, port) by editing the teeminus10.config file.
