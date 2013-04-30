@@ -13,6 +13,12 @@ Weather data provided by: http://openweathermap.org
 
 ISS location data provided by: http://open-notify.org and Celestrak (http://celestrak.net)
 
+Uses PyEphem (http://rhodesmill.org/pyephem/) for computation of ISS passes, times, and sunset/sunrise for a given location.
+
+Uses Flask (http://flask.pocoo.org/) for providing the web application, together with Flask-RESTful (http://flask-restful.readthedocs.org/en/latest/) to provide a RESTful API.
+
+Uses Requests (http://docs.python-requests.org/en/latest/) for client-side interfacing with other web services.
+
 How to use
 ==========
 Set up a Python virtualenv and then run the following from the t-10_server directory:
