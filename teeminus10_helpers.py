@@ -20,9 +20,11 @@ ACS_URLS = { 'notify': "https://api.cloud.appcelerator.com/v1/push_notification/
 
 TIMERS = {}
 
-def in_time_of_day(city, pass_time, time_of_day):
-    '''Returns sunset and sunrise times for the given city at date'''
-    location = ephem.city(city)
+def in_time_of_day(observer, pass_time, time_of_day):
+    '''Returns sunset and sunrise times for the given Observer at date'''
+    location = ephem.Observer()
+    location.lat = observer.lat
+    location.long = observer.long
     location.date = pass_time
     sun = ephem.Sun()
     if time_of_day == "day":
@@ -83,7 +85,7 @@ class T10Helper():
         return result['data']['current_condition'][0]['cloudcover']
 
 
-    def get_next_passes(self, lat, lon, altitude, count, force_visible=False):
+    def get_next_passes(self, lat, lon, altitude, count, force_visible=False, time_of_day="either"):
         '''Returns a list of the next visible passes for the ISS'''
 
         tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text # Do not scrape all the time for release!
@@ -102,15 +104,18 @@ class T10Helper():
 
         location.date = datetime.utcnow()
         passes = []
-        for p in xrange(count):
+        now_plus_ten_days = datetime.utcnow() + timedelta(days=10)
+        while len(passes) < count and location.date.datetime() < now_plus_ten_days:
             tr, azr, tt, altt, ts, azs = location.next_pass(iss)
-            duration = int((ts - tr) * 60 * 60 * 24)
-            year, month, day, hour, minute, second = tr.tuple()
-	    dt = datetime(year, month, day, hour, minute, int(second))
+            # Skip if the pass is at the wrong time of day
+            if in_time_of_day(location, datetime.utcfromtimestamp(tr), time_of_day):
+                duration = int((ts - tr) * 60 * 60 * 24)
+                year, month, day, hour, minute, second = tr.tuple()
+                dt = datetime(year, month, day, hour, minute, int(second))
+                if not (force_visible and iss.eclipsed):
+                    passes.append({"risetime": timegm(dt.timetuple()), "duration": duration, "azimuth": ephem.degrees(azr), "altitude": ephem.degrees(altt)})
             location.date = tr
             iss.compute(location)
-            if not (force_visible and iss.eclipsed):
-                passes.append({"risetime": timegm(dt.timetuple()), "duration": duration, "azimuth": ephem.degrees(azr), "altitude": ephem.degrees(altt)})
             location.date = tr + 25 * ephem.minute
 
         return {"response": passes }
@@ -140,7 +145,7 @@ class T10Helper():
         finally:
             TIMERS[city] = []
         location = ephem.city(city)
-        result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count)
+        result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count, time_of_day=timeofday)
         next_passes = result['response']
         # For every pass, set up a trigger for 10 minutes earlier and send it
         # to the 'space' channel
@@ -148,9 +153,6 @@ class T10Helper():
         for p in next_passes:
             risetime = datetime.utcfromtimestamp(p['risetime'])
             weather_data = WeatherData(city)
-            # Skip if the pass is at the wrong time of day
-            if not in_time_of_day(city, risetime, timeofday):
-                continue
             riseminus10 = risetime - timedelta(minutes=15)
             delay = (riseminus10 - datetime.utcnow()).total_seconds()
             print "Running in {0} seconds...".format(delay)
