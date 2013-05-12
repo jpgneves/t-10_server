@@ -144,7 +144,7 @@ class T10Helper():
         #print url
         #r = requests.get(url)
         #result = json.loads(r.text)
-        result = self.get_next_visible_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count)
+        result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count)
         next_passes = result['response']
         # For every pass, set up a trigger for 10 minutes earlier and send it
         # to the 'space' channel
