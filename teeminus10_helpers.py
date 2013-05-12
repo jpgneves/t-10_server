@@ -155,15 +155,16 @@ class T10Helper():
             # Skip if the pass is at the wrong time of day
             if not in_time_of_day(city, risetime, timeofday):
                 continue
-            riseminus10 = risetime - timedelta(minutes=10)
+            riseminus10 = risetime - timedelta(minutes=15)
             delay = (riseminus10 - datetime.utcnow()).total_seconds()
             print "Running in {0} seconds...".format(delay)
             def f():
                 weather_data = WeatherData(city)
                 cloud_cover = weather_data.current_cloud_cover()
+                alert_time = datetime.utcnow() + timedelta(minutes=5)
                 if cloud_cover <= acc_cloud_cover:
                     print "Cloud cover acceptable"
-                    self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'cloudcover': cloud_cover}))
+                    self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'alert_time': alert_time, 'cloudcover': cloud_cover}))
             t = threading.Timer(delay, f)
             TIMERS[city].append(t)
             t.start()
