@@ -9,7 +9,8 @@ from math import degrees
 API_URLS = { 'iss': "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}",
              'weather': {'city_now': "http://api.openweathermap.org/data/2.5/weather?q={0}",
                          'coord_now': "http://api.openweathermap.org/data/2.5/weather?lat={0}&lon={1}",
-                         'city_forecast': "http://api.openweathermap.org/data/2.5/forecast?q={0}"
+                         'city_forecast': "http://api.openweathermap.org/data/2.5/forecast?q={0}",
+                         'city_search': "http://api.openweathermap.org/data/2.5/find?q={0}&mode=json"
                      }
          }
 
@@ -38,6 +39,26 @@ def in_time_of_day(observer, pass_time, time_of_day):
         return (previous_setting.date() == pass_time.date() and pass_time <= next_rising) or (next_rising.date() == pass_time.date() and pass_time <= next_rising)
     else:
         return True
+
+def get_latlong_from_city(city):
+    tokens = [t.strip() for t in city.split(',')]
+    url = API_URLS['weather']['city_search'].format(tokens[0])
+    r = requests.get(url)
+    data = json.loads(r.text)
+    for city in data['list']:
+        country_code = city['sys']['country']
+        if len(tokens) > 1 and country_code == tokens[1]:
+            return {'lat': city['coord']['lat'] * ephem.degree,
+                    'long': city['coord']['lon'] * ephem.degree,
+                    'city': city['name'],
+                    'country_code': country_code}
+    # If we got here, we don't know. Just return the first result
+    city = data['list'][0]
+    country_code = city['sys']['country']
+    return {'lat': city['coord']['lat'] * ephem.degree,
+            'long': city['coord']['lon'] * ephem.degree,
+            'city': city['name'],
+            'country_code': country_code}
 
 class WeatherData():
     def __init__(self, city):
@@ -134,7 +155,7 @@ class T10Helper():
 
         return {'response': {'latitude': lat, 'longitude': lon}}
 
-    def alert_next_passes(self, acc_cloud_cover, timeofday, device_id, count=10, city=None, coord=(0.0, 0.0)):
+    def alert_next_passes(self, acc_cloud_cover, timeofday, device_id, count=10, city="", coord=(0.0, 0.0)):
         '''Sets up alerts for up to the next 10 passes of the ISS over the given city or lat/lon. Alerts will be sent to the device that registered for them'''
         try:
             # Cancel previous timers.
@@ -144,7 +165,19 @@ class T10Helper():
             pass
         finally:
             TIMERS[city] = []
-        location = ephem.city(city)
+        location = ephem.Observer()
+        city_name = city
+        country = ""
+        if city is not "":
+            data = get_latlong_from_city(city)
+            city_name = data['city']
+            country = data['country_code']
+            location.lat = data['lat']
+            location.long = data['long']
+        else:
+            location.lat = coord[0]
+            location.long = coord[1]
+        print location
         result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count, time_of_day=timeofday)
         next_passes = result['response']
         # For every pass, set up a trigger for 10 minutes earlier and send it
@@ -167,7 +200,7 @@ class T10Helper():
             TIMERS[city].append(t)
             t.start()
             cloud_forecast = weather_data.cloud_forecast(datetime.utcfromtimestamp(p['risetime']))
-            real_response.append({'location': city,
+            real_response.append({'location': {'city': city_name, 'country': country},
                                   'duration': p['duration'],
                                   'time_str': str(risetime),
                                   'time': p['risetime'],
