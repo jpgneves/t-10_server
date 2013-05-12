@@ -140,10 +140,6 @@ class T10Helper():
         finally:
             TIMERS[city] = []
         location = ephem.city(city)
-        url = API_URLS['iss'].format(degrees(location.lat), degrees(location.lon), int(location.elevation), count)
-        #print url
-        #r = requests.get(url)
-        #result = json.loads(r.text)
         result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count)
         next_passes = result['response']
         # For every pass, set up a trigger for 10 minutes earlier and send it
@@ -169,9 +165,13 @@ class T10Helper():
             TIMERS[city].append(t)
             t.start()
             cloud_forecast = weather_data.cloud_forecast(datetime.utcfromtimestamp(p['risetime']))
-            real_response.append({'location': city, 'time_str': str(risetime), 'time': p['risetime'], 'cloudcover': cloud_forecast, 'trigger_time': str(riseminus10)})
+            real_response.append({'location': city,
+                                  'duration': p['duration'],
+                                  'time_str': str(risetime),
+                                  'time': p['risetime'],
+                                  'cloudcover': cloud_forecast,
+                                  'trigger_time': str(riseminus10)})
             #print real_response
-        print "Length:", len(real_response)
         return real_response
 
 class T10ACSHelper():
