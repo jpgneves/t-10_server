@@ -99,7 +99,6 @@ class T10Helper():
     def get_cloud_cover(self, city):
         '''Gets cloud cover in % for the given city'''
         url = API_URLS['weather']['city_search'].format(city)
-        print url
         r = requests.get(url)
         try:
             result = json.loads(r.text)
@@ -179,9 +178,8 @@ class T10Helper():
             pass
         finally:
             TIMERS[city] = []
-        print location
         result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count, time_of_day=timeofday)
-        self.tz.get_timezone(degrees(location.lat), degrees(location.lon))
+        tzinfo = self.tz.get_timezone(degrees(location.lat), degrees(location.lon))
         next_passes = result['response']
         # For every pass, set up a trigger for 10 minutes earlier and send it
         # to the 'space' channel
