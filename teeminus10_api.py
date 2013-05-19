@@ -8,7 +8,7 @@ import flask.ext.restful as restful
 import json
 import types
 from ConfigParser import SafeConfigParser
-from teeminus10_helpers import T10Helper, T10ACSHelper
+from teeminus10_helpers import T10Helper, T10ACSHelper, T10TZHelper
 
 app = Flask("T-10")
 api = restful.Api(app)
@@ -29,7 +29,8 @@ api = restful.Api(app)
 config = SafeConfigParser({'host': '0.0.0.0', 'port': '5000', 'debug': 'False'})
 config.read("./teeminus10.config")
 acs_helper = T10ACSHelper(config.get('ACS', 'user'), config.get('ACS', 'password'), config.get('ACS', 'key'))
-t10_helper = T10Helper(acs_helper)
+tz_helper = T10TZHelper(config.get('Geonames', 'user'))
+t10_helper = T10Helper(acs_helper, tz_helper)
 
 class Alert(Resource):
     def get(self):

@@ -11,7 +11,8 @@ API_URLS = { 'iss': "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={
                          'coord_now': "http://api.openweathermap.org/data/2.5/weather?lat={0}&lon={1}",
                          'city_forecast': "http://api.openweathermap.org/data/2.5/forecast?q={0}",
                          'city_search': "http://api.openweathermap.org/data/2.5/find?q={0}&mode=json"
-                     }
+                     },
+             'timezone': "http://api.geonames.org/timezoneJSON?username={0}&lat={1}&lng={2}"
          }
 
 ACS_URLS = { 'notify': "https://api.cloud.appcelerator.com/v1/push_notification/notify.json?key={0}",
@@ -91,8 +92,9 @@ class WeatherData():
 
 class T10Helper():
     '''"Server" for handling alerts, checking weather, what not.'''
-    def __init__(self, acs):
+    def __init__(self, acs, tz):
         self.acs = acs
+        self.tz = tz
 
     def get_cloud_cover(self, city):
         '''Gets cloud cover in % for the given city'''
@@ -179,6 +181,7 @@ class T10Helper():
             TIMERS[city] = []
         print location
         result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count, time_of_day=timeofday)
+        self.tz.get_timezone(degrees(location.lat), degrees(location.lon))
         next_passes = result['response']
         # For every pass, set up a trigger for 10 minutes earlier and send it
         # to the 'space' channel
@@ -205,7 +208,9 @@ class T10Helper():
                                   'time_str': str(risetime),
                                   'time': p['risetime'],
                                   'cloudcover': cloud_forecast,
-                                  'trigger_time': str(riseminus15)})
+                                  'trigger_time': str(riseminus15),
+                                  'tzinfo': tzinfo
+                              })
             #print real_response
         return real_response
 
@@ -218,6 +223,17 @@ class T10Helper():
             pass
         finally:
             TIMERS[city] = []
+
+class T10TZHelper():
+    '''Gets timezone information'''
+    def __init__(self, username):
+        self.user = username
+
+    def get_timezone(self, lat, lon):
+        url = API_URLS['timezone'].format(self.user, lat, lon)
+        r = requests.get(url)
+        data = json.loads(r.text)
+        return {'utc_offset': data['rawOffset'], 'timezone': data['timezoneId']}
 
 class T10ACSHelper():
     '''Handles connections to Appcelerator Cloud Services and does push notifications'''
