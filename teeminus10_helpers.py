@@ -231,7 +231,10 @@ class T10TZHelper():
         url = API_URLS['timezone'].format(self.user, lat, lon)
         r = requests.get(url)
         data = json.loads(r.text)
-        return {'utc_offset': data['rawOffset'], 'timezone': data['timezoneId']}
+        try:
+            return {'utc_offset': data['rawOffset'], 'timezone': data['timezoneId']}
+        except KeyError:
+            return {}
 
 class T10ACSHelper():
     '''Handles connections to Appcelerator Cloud Services and does push notifications'''
