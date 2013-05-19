@@ -13,6 +13,8 @@ Weather data provided by: http://openweathermap.org
 
 ISS location data provided by: http://open-notify.org and Celestrak (http://celestrak.net)
 
+Timezone information provided through GeoNames.org (http://geonames.org).
+
 Powered by Python, with support of the following (awesome) libraries provided by the OSS community:
 
 * PyEphem (http://rhodesmill.org/pyephem/) for computation of ISS passes, times, and sunset/sunrise for a given location.
