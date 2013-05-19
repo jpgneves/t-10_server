@@ -37,18 +37,20 @@ class Alert(Resource):
     def put(self):
         data = request.json
         if data is not None:
+            city = ""
+            coord = (0.0, 0.0)
             try:
                 city = data['location']['city']
-                coord = (0.0, 0.0)
             except KeyError:
-                city = None
                 coord = (data['location']['latitude'], data['location']['longitude'])
             finally:
                 device_id = data['device_id']
                 next_passes = t10_helper.alert_next_passes(data['max_cloud_cover'], data['time_of_day'], device_id, city=city, coord=coord)
                 print next_passes
                 return {'response': next_passes}
-    def delete(self, alert_id):
+    def delete(self):
+        data = request.json
+        t10_helper.delete_alerts(data['location']['city'])
         return {'response': 'ok'}
 
 class Wave(Resource):

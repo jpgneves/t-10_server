@@ -157,14 +157,6 @@ class T10Helper():
 
     def alert_next_passes(self, acc_cloud_cover, timeofday, device_id, count=10, city="", coord=(0.0, 0.0)):
         '''Sets up alerts for up to the next 10 passes of the ISS over the given city or lat/lon. Alerts will be sent to the device that registered for them'''
-        try:
-            # Cancel previous timers.
-            for t in TIMERS[city]:
-                t.cancel()
-        except KeyError:
-            pass
-        finally:
-            TIMERS[city] = []
         location = ephem.Observer()
         city_name = city
         country = ""
@@ -177,6 +169,14 @@ class T10Helper():
         else:
             location.lat = coord[0]
             location.long = coord[1]
+        try:
+            # Cancel previous timers.
+            for t in TIMERS[city]:
+                t.cancel()
+        except KeyError:
+            pass
+        finally:
+            TIMERS[city] = []
         print location
         result = self.get_next_passes(degrees(location.lat), degrees(location.lon), int(location.elevation), count, time_of_day=timeofday)
         next_passes = result['response']
@@ -186,8 +186,8 @@ class T10Helper():
         for p in next_passes:
             risetime = datetime.utcfromtimestamp(p['risetime'])
             weather_data = WeatherData(city)
-            riseminus10 = risetime - timedelta(minutes=15)
-            delay = (riseminus10 - datetime.utcnow()).total_seconds()
+            riseminus15 = risetime - timedelta(minutes=15)
+            delay = (riseminus15 - datetime.utcnow()).total_seconds()
             print "Running in {0} seconds...".format(delay)
             def f():
                 weather_data = WeatherData(city)
@@ -205,9 +205,19 @@ class T10Helper():
                                   'time_str': str(risetime),
                                   'time': p['risetime'],
                                   'cloudcover': cloud_forecast,
-                                  'trigger_time': str(riseminus10)})
+                                  'trigger_time': str(riseminus15)})
             #print real_response
         return real_response
+
+    def delete_alerts(self, city):
+        try:
+            # Cancel previous timers.
+            for t in TIMERS[city]:
+                t.cancel()
+        except KeyError:
+            pass
+        finally:
+            TIMERS[city] = []
 
 class T10ACSHelper():
     '''Handles connections to Appcelerator Cloud Services and does push notifications'''
