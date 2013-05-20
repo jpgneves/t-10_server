@@ -201,13 +201,14 @@ class T10Helper():
             TIMERS[city].append(t)
             t.start()
             cloud_forecast = weather_data.cloud_forecast(datetime.utcfromtimestamp(p['risetime']))
-            real_response.append({'location': {'city': city_name, 'country': country},
+            real_response.append({'location': dict({'city': city_name,
+                                                    'country': country,
+                                                }.items() + tzinfo.items()),
                                   'duration': p['duration'],
                                   'time_str': str(risetime),
                                   'time': p['risetime'],
                                   'cloudcover': cloud_forecast,
                                   'trigger_time': str(riseminus15),
-                                  'tzinfo': tzinfo
                               })
             #print real_response
         return real_response
