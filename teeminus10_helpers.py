@@ -127,6 +127,7 @@ class T10Helper():
         location.date = datetime.utcnow()
         passes = []
         now_plus_ten_days = datetime.utcnow() + timedelta(days=10)
+        iss.compute(location)
         while len(passes) < count and location.date.datetime() < now_plus_ten_days:
             tr, azr, tt, altt, ts, azs = location.next_pass(iss)
             # Skip if the pass is at the wrong time of day
