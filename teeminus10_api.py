@@ -15,7 +15,7 @@ from teeminus10_helpers import T10Helper, T10ACSHelper, T10TZHelper
 logger = logging.getLogger('teeminus10')
 logger.setLevel(logging.DEBUG)
 
-rfh = logging.handlers.RotatingFileHandler('teeminus10.log', maxBytes=10*1024*1024) # 10 MB per log file
+rfh = logging.handlers.RotatingFileHandler('teeminus10.log', maxBytes=10*1024*1024, backupCount=10) # 10 MB per log file
 rfh.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter('%(asctime)s - %(levelname)s: %(message)s')
