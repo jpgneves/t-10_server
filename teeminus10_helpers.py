@@ -70,11 +70,11 @@ class WeatherData():
     def __do_get(self, url):
         with requests_cache.disabled():
             r = requests.get(url)
-            logging.info("Request of weather data to %s.".format(url))
+            logging.info("Request of weather data to {0}.".format(url))
             try:
                 return json.loads(r.text)
             except ValueError:
-                logging.warning("Could not get weather data from %s".format(url))
+                logging.warning("Could not get weather data from {0}".format(url))
                 return {} # Something went wrong!
 
     def current_cloud_cover(self):
@@ -100,21 +100,29 @@ class T10Helper():
     def __init__(self, acs, tz):
         self.acs = acs
         self.tz = tz
-        # Install in-memory cache for celestrak with a 24 hour duration
+        # Install sqlite cache for celestrak with a 24 hour duration
         # Good enough for celestrak and other data. Cache disabled when appropriate
-        requests_cache.install_cache('teeminus_cache', backend='memory', expire_after=24*60*60)
+        requests_cache.install_cache('teeminus_cache', expire_after=24*60*60)
         requests_cache.clear()
+
+    def __get_iss_data(self):
+        r = requests.get("http://celestrak.com/NORAD/elements/stations.txt")
+        tle_data = r.text
+        logging.info("Requested celestrak data. Cached: {0}".format(r.from_cache))
+        iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
+
+        return ephem.readtle(*iss_tle)
 
     def get_cloud_cover(self, city):
         '''Gets cloud cover in % for the given city'''
         url = API_URLS['weather']['city_search'].format(city)
-        logging.info("Requesting cloud cover for %s.".format(city))
+        logging.info("Requesting cloud cover for {0}.".format(city))
         with requests_cache.disabled():
             r = requests.get(url)
             try:
                 result = json.loads(r.text)
             except ValueError:
-                logging.warning("Could not get cloud cover for %s".format(city))
+                logging.warning("Could not get cloud cover for {0}".format(city))
                 return '0'
             return result['data']['current_condition'][0]['cloudcover']
 
@@ -122,11 +130,7 @@ class T10Helper():
     def get_next_passes(self, lat, lon, altitude, count, force_visible=False, time_of_day="either"):
         '''Returns a list of the next visible passes for the ISS'''
 
-        tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text
-        logging.info("Requested celestrak data. Cached = %s".format(tle_data.from_cache))
-        iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
-
-        iss = ephem.readtle(*iss_tle)
+        iss = self.__get_iss_data()
 
         location = ephem.Observer()
         location.lat = str(lat)
@@ -158,11 +162,7 @@ class T10Helper():
 
     def get_current_iss_location(self):
         '''Returns the current ISS location'''
-        tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text # Do not scrape all the time for release!
-        logging.info("Requested celestrak data. Cached = %s".format(tle_data.from_cache))
-        iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
-
-        iss = ephem.readtle(*iss_tle)
+        iss = self.__get_iss_data()
 
         now = datetime.utcnow()
         iss.compute(now)
@@ -211,7 +211,7 @@ class T10Helper():
                 cloud_cover = weather_data.current_cloud_cover()
                 alert_time = datetime.utcnow() + timedelta(minutes=5)
                 if cloud_cover <= acc_cloud_cover:
-                    logging.debug("Cloud cover acceptable for %s".format(city))
+                    logging.debug("Cloud cover acceptable for {0}".format(city))
                     self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city,
                                                                                       'alert_time': alert_time,
                                                                                       'cloudcover': cloud_cover}))
@@ -248,12 +248,12 @@ class T10TZHelper():
     def get_timezone(self, lat, lon):
         url = API_URLS['timezone'].format(self.user, lat, lon)
         r = requests.get(url)
-        logging.info("Requested timezone data. Cached: %s".format(r.from_cache))
+        logging.info("Requested timezone data. Cached: {0}".format(r.from_cache))
         data = json.loads(r.text)
         try:
             return {'utc_offset': data['rawOffset'], 'timezone': data['timezoneId']}
         except KeyError:
-            logging.info("Got no timezone data for %s %s".format(lat, lon))
+            logging.info("Got no timezone data for {0} {1}".format(lat, lon))
             return {}
 
 class T10ACSHelper():

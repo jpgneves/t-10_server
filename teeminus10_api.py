@@ -48,7 +48,7 @@ class Alert(Resource):
             finally:
                 device_id = data['device_id']
                 next_passes = t10_helper.alert_next_passes(data['max_cloud_cover'], data['time_of_day'], device_id, city=city, coord=coord)
-                print next_passes
+                logging.debug("Request for passes: {0}".format(next_passes))
                 return {'response': next_passes}
     def delete(self):
         data = request.json
