@@ -6,6 +6,7 @@ from flask_oauth import OAuth
 from flask.ext.restful import reqparse, abort, Api, Resource
 import flask.ext.restful as restful
 import json
+import logging
 import types
 from ConfigParser import SafeConfigParser
 from teeminus10_helpers import T10Helper, T10ACSHelper, T10TZHelper
@@ -94,6 +95,7 @@ api.add_resource(Wave, '/alerts/wave/start/<int:alert_id>', '/alerts/wave/back')
 #        return redirect('/')
 
 if __name__ == '__main__':
+    logging.basicConfig(filename='teeminus10.log', level=logging.INFO)
     host = config.get('TeeMinus10', 'host')
     port = int(config.get('TeeMinus10', 'port'))
     debug = bool(config.get('TeeMinus10', 'debug'))

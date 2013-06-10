@@ -1,6 +1,8 @@
 import ephem
+import logging
 import json
 import requests
+import requests_cache
 import threading
 from calendar import timegm
 from datetime import datetime, timedelta
@@ -66,11 +68,14 @@ class WeatherData():
         self.city = city
 
     def __do_get(self, url):
-        r = requests.get(url)
-        try:
-            return json.loads(r.text)
-        except ValueError:
-            return {} # Something went wrong!
+        with requests_cache.disabled():
+            r = requests.get(url)
+            logging.info("Request of weather data to %s.".format(url))
+            try:
+                return json.loads(r.text)
+            except ValueError:
+                logging.warning("Could not get weather data from %s".format(url))
+                return {} # Something went wrong!
 
     def current_cloud_cover(self):
         url = API_URLS['weather']['city_now'].format(self.city)
@@ -95,22 +100,30 @@ class T10Helper():
     def __init__(self, acs, tz):
         self.acs = acs
         self.tz = tz
+        # Install in-memory cache for celestrak with a 24 hour duration
+        # Good enough for celestrak and other data. Cache disabled when appropriate
+        requests_cache.install_cache('teeminus_cache', backend='memory', expire_after=24*60*60)
+        requests_cache.clear()
 
     def get_cloud_cover(self, city):
         '''Gets cloud cover in % for the given city'''
         url = API_URLS['weather']['city_search'].format(city)
-        r = requests.get(url)
-        try:
-            result = json.loads(r.text)
-        except ValueError:
-            return '0'
-        return result['data']['current_condition'][0]['cloudcover']
+        logging.info("Requesting cloud cover for %s.".format(city))
+        with requests_cache.disabled():
+            r = requests.get(url)
+            try:
+                result = json.loads(r.text)
+            except ValueError:
+                logging.warning("Could not get cloud cover for %s".format(city))
+                return '0'
+            return result['data']['current_condition'][0]['cloudcover']
 
 
     def get_next_passes(self, lat, lon, altitude, count, force_visible=False, time_of_day="either"):
         '''Returns a list of the next visible passes for the ISS'''
 
-        tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text # Do not scrape all the time for release!
+        tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text
+        logging.info("Requested celestrak data. Cached = %s".format(tle_data.from_cache))
         iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
 
         iss = ephem.readtle(*iss_tle)
@@ -145,6 +158,7 @@ class T10Helper():
     def get_current_iss_location(self):
         '''Returns the current ISS location'''
         tle_data = requests.get("http://celestrak.com/NORAD/elements/stations.txt").text # Do not scrape all the time for release!
+        logging.info("Requested celestrak data. Cached = %s".format(tle_data.from_cache))
         iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
 
         iss = ephem.readtle(*iss_tle)
@@ -157,7 +171,8 @@ class T10Helper():
         return {'response': {'latitude': lat, 'longitude': lon}}
 
     def alert_next_passes(self, acc_cloud_cover, timeofday, device_id, count=10, city="", coord=(0.0, 0.0)):
-        '''Sets up alerts for up to the next 10 passes of the ISS over the given city or lat/lon. Alerts will be sent to the device that registered for them'''
+        '''Sets up alerts for up to the next 10 passes of the ISS over the given city or lat/lon.
+        Alerts will be sent to the device that registered for them'''
         location = ephem.Observer()
         city_name = city
         country = ""
@@ -189,14 +204,16 @@ class T10Helper():
             weather_data = WeatherData(city)
             riseminus15 = risetime - timedelta(minutes=15)
             delay = (riseminus15 - datetime.utcnow()).total_seconds()
-            print "Running in {0} seconds...".format(delay)
+            logging.debug("Running in {0} seconds...".format(delay))
             def f():
                 weather_data = WeatherData(city)
                 cloud_cover = weather_data.current_cloud_cover()
                 alert_time = datetime.utcnow() + timedelta(minutes=5)
                 if cloud_cover <= acc_cloud_cover:
-                    print "Cloud cover acceptable"
-                    self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city, 'alert_time': alert_time, 'cloudcover': cloud_cover}))
+                    logging.debug("Cloud cover acceptable for %s".format(city))
+                    self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city,
+                                                                                      'alert_time': alert_time,
+                                                                                      'cloudcover': cloud_cover}))
             t = threading.Timer(delay, f)
             TIMERS[city].append(t)
             t.start()
@@ -210,7 +227,6 @@ class T10Helper():
                                   'cloudcover': cloud_forecast,
                                   'trigger_time': str(riseminus15),
                               })
-            #print real_response
         return real_response
 
     def delete_alerts(self, city):
@@ -231,10 +247,12 @@ class T10TZHelper():
     def get_timezone(self, lat, lon):
         url = API_URLS['timezone'].format(self.user, lat, lon)
         r = requests.get(url)
+        logging.info("Requested timezone data. Cached: %s".format(r.from_cache))
         data = json.loads(r.text)
         try:
             return {'utc_offset': data['rawOffset'], 'timezone': data['timezoneId']}
         except KeyError:
+            logging.info("Got no timezone data for %s %s".format(lat, lon))
             return {}
 
 class T10ACSHelper():
@@ -249,19 +267,21 @@ class T10ACSHelper():
     def __login(self):
         '''Need to login to appcelerator'''
         payload = {'login':self.user, 'password':self.password}
-        r = requests.post(ACS_URLS['login'].format(self.key), data=payload)
-        self.cookies = r.cookies
+
+        with requests_cache.disabled():
+            r = requests.post(ACS_URLS['login'].format(self.key), data=payload)
+            self.cookies = r.cookies
 
     def subscribe_device(self, channel, device_type, device_id):
         try:
             self.clients[channel].append(device_id)
         except KeyError:
             self.clients[channel] = [device_id]
-            #print self.clients
         finally:
             url = ACS_URLS['subscribe'].format(self.key)
             payload = {'type':device_type, 'device_id':device_id, 'channel':'channel'}
-            r = requests.post(url, data=payload, cookies=self.cookies)
+            with requests_cache.disabled():
+                r = requests.post(url, data=payload, cookies=self.cookies)
 
     def push_to_channel(self, channel, message):
         try:
@@ -270,9 +290,9 @@ class T10ACSHelper():
             return
 
     def push_to_ids_at_channel(self, channel, ids, message):
-        print "Pushing {0} to {1}".format(message, channel)
+        logging.debug("Pushing {0} to {1}".format(message, channel))
         string_ids = ",".join(ids)
         payload = {'channel':channel, 'to_ids':string_ids, 'payload':json.dumps({'badge':2, 'sound':'default', 'alert':message})}
         url = ACS_URLS['notify'].format(self.key)
-        #print url
-        r = requests.post(url, data=payload, cookies=self.cookies)
+        with requests_cache.disabled():
+            r = requests.post(url, data=payload, cookies=self.cookies)
