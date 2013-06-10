@@ -8,6 +8,8 @@ from calendar import timegm
 from datetime import datetime, timedelta
 from math import degrees
 
+logger = logging.getLogger('teeminus10')
+
 API_URLS = { 'iss': "http://api.open-notify.org/iss/?lat={0}&lon={1}&alt={2}&n={3}",
              'weather': {'city_now': "http://api.openweathermap.org/data/2.5/weather?q={0}",
                          'coord_now': "http://api.openweathermap.org/data/2.5/weather?lat={0}&lon={1}",
@@ -70,11 +72,11 @@ class WeatherData():
     def __do_get(self, url):
         with requests_cache.disabled():
             r = requests.get(url)
-            logging.info("Request of weather data to {0}.".format(url))
+            logger.info("Request of weather data to {0}.".format(url))
             try:
                 return json.loads(r.text)
             except ValueError:
-                logging.warning("Could not get weather data from {0}".format(url))
+                logger.warning("Could not get weather data from {0}".format(url))
                 return {} # Something went wrong!
 
     def current_cloud_cover(self):
@@ -108,7 +110,7 @@ class T10Helper():
     def __get_iss_data(self):
         r = requests.get("http://celestrak.com/NORAD/elements/stations.txt")
         tle_data = r.text
-        logging.info("Requested celestrak data. Cached: {0}".format(r.from_cache))
+        logger.info("Requested celestrak data. Cached: {0}".format(r.from_cache))
         iss_tle = [str(l).strip() for l in tle_data.split('\r\n')[:3]]
 
         return ephem.readtle(*iss_tle)
@@ -116,13 +118,13 @@ class T10Helper():
     def get_cloud_cover(self, city):
         '''Gets cloud cover in % for the given city'''
         url = API_URLS['weather']['city_search'].format(city)
-        logging.info("Requesting cloud cover for {0}.".format(city))
+        logger.info("Requesting cloud cover for {0}.".format(city))
         with requests_cache.disabled():
             r = requests.get(url)
             try:
                 result = json.loads(r.text)
             except ValueError:
-                logging.warning("Could not get cloud cover for {0}".format(city))
+                logger.warning("Could not get cloud cover for {0}".format(city))
                 return '0'
             return result['data']['current_condition'][0]['cloudcover']
 
@@ -205,13 +207,13 @@ class T10Helper():
             weather_data = WeatherData(city)
             riseminus15 = risetime - timedelta(minutes=15)
             delay = (riseminus15 - datetime.utcnow()).total_seconds()
-            logging.debug("Running in {0} seconds...".format(delay))
+            logger.debug("Running in {0} seconds...".format(delay))
             def f():
                 weather_data = WeatherData(city)
                 cloud_cover = weather_data.current_cloud_cover()
                 alert_time = datetime.utcnow() + timedelta(minutes=5)
                 if cloud_cover <= acc_cloud_cover:
-                    logging.debug("Cloud cover acceptable for {0}".format(city))
+                    logger.debug("Cloud cover acceptable for {0}".format(city))
                     self.acs.push_to_ids_at_channel('space', [device_id], json.dumps({'location': city,
                                                                                       'alert_time': alert_time,
                                                                                       'cloudcover': cloud_cover}))
@@ -248,12 +250,12 @@ class T10TZHelper():
     def get_timezone(self, lat, lon):
         url = API_URLS['timezone'].format(self.user, lat, lon)
         r = requests.get(url)
-        logging.info("Requested timezone data. Cached: {0}".format(r.from_cache))
+        logger.info("Requested timezone data. Cached: {0}".format(r.from_cache))
         data = json.loads(r.text)
         try:
             return {'utc_offset': data['rawOffset'], 'timezone': data['timezoneId']}
         except KeyError:
-            logging.info("Got no timezone data for {0} {1}".format(lat, lon))
+            logger.info("Got no timezone data for {0} {1}".format(lat, lon))
             return {}
 
 class T10ACSHelper():
@@ -291,7 +293,7 @@ class T10ACSHelper():
             return
 
     def push_to_ids_at_channel(self, channel, ids, message):
-        logging.debug("Pushing {0} to {1}".format(message, channel))
+        logger.debug("Pushing {0} to {1}".format(message, channel))
         string_ids = ",".join(ids)
         payload = {'channel':channel, 'to_ids':string_ids, 'payload':json.dumps({'badge':2, 'sound':'default', 'alert':message})}
         url = ACS_URLS['notify'].format(self.key)

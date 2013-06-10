@@ -7,9 +7,21 @@ from flask.ext.restful import reqparse, abort, Api, Resource
 import flask.ext.restful as restful
 import json
 import logging
+import logging.handlers
 import types
 from ConfigParser import SafeConfigParser
 from teeminus10_helpers import T10Helper, T10ACSHelper, T10TZHelper
+
+logger = logging.getLogger('teeminus10')
+logger.setLevel(logging.DEBUG)
+
+rfh = logging.handlers.RotatingFileHandler('teeminus10.log', maxBytes=10*1024*1024) # 10 MB per log file
+rfh.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s: %(message)s')
+rfh.setFormatter(formatter)
+
+logger.addHandler(rfh)
 
 app = Flask("T-10")
 api = restful.Api(app)
@@ -95,7 +107,6 @@ api.add_resource(Wave, '/alerts/wave/start/<int:alert_id>', '/alerts/wave/back')
 #        return redirect('/')
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='teeminus10.log', level=logging.INFO)
     host = config.get('TeeMinus10', 'host')
     port = int(config.get('TeeMinus10', 'port'))
     debug = bool(config.get('TeeMinus10', 'debug'))
