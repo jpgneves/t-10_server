@@ -102,7 +102,7 @@ class T10Helper():
         self.tz = tz
         # Install sqlite cache for celestrak with a 24 hour duration
         # Good enough for celestrak and other data. Cache disabled when appropriate
-        requests_cache.install_cache('teeminus_cache', expire_after=24*60*60)
+        requests_cache.install_cache('teeminus10_cache', expire_after=24*60*60)
         requests_cache.clear()
 
     def __get_iss_data(self):
