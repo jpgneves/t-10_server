@@ -4,6 +4,7 @@ import json
 import requests
 import requests_cache
 import threading
+import unittest
 from calendar import timegm
 from datetime import datetime, timedelta
 from math import degrees
@@ -299,3 +300,25 @@ class T10ACSHelper():
         url = ACS_URLS['notify'].format(self.key)
         with requests_cache.disabled():
             r = requests.post(url, data=payload, cookies=self.cookies)
+
+# Unit tests
+
+class TestInTimeOfDay(unittest.TestCase):
+    def setUp(self):
+        self.location = ephem.city('London')
+        self.location.date = datetime(2013, 03, 14, 9, 0, 0)
+        self.pass_day_time = datetime(2013, 03, 14, 12, 0, 0)
+        self.pass_night_time = datetime(2013, 03, 14, 0, 0, 0)
+        self.sun = ephem.Sun("2013/03/14")
+        
+    def test_pass_in_whatever_time(self):
+        self.assertTrue(in_time_of_day(self.location, self.pass_day_time, "whatever"))
+        self.assertTrue(in_time_of_day(self.location, self.pass_night_time, "whatever"))
+
+    def test_pass_in_day_time(self):
+        self.assertTrue(in_time_of_day(self.location, self.pass_day_time, "day"))
+        self.assertFalse(in_time_of_day(self.location, self.pass_night_time, "day"))
+
+    def test_pass_in_night_time(self):
+        self.assertFalse(in_time_of_day(self.location, self.pass_day_time, "night"))
+        self.assertTrue(in_time_of_day(self.location, self.pass_night_time, "night"))
