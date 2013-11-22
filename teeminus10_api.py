@@ -94,6 +94,18 @@ class ISSPass(Resource):
 
 class ISSLocation(Resource):
     def get(self):
+        """Returns the current location of the ISS
+
+        :statuscode 200: A response object is returned as follows
+
+          .. sourcecode:: js
+
+             {
+               'latitude': LAT,
+               'longitude': LON
+             }
+
+        """
         return t10_helper.get_current_iss_location()
 
 api.add_resource(ISSLocation, '/location')

@@ -11,7 +11,18 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+REST API documentation
+======================
 
+.. autoflask:: teeminus10_api:app
+   :undoc-static:
+
+Python documentation
+====================
+.. automodule:: teeminus10_api
+   :members:
+.. automodule:: teeminus10_helpers
+   :members:
 
 Indices and tables
 ==================
