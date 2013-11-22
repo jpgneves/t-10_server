@@ -7,7 +7,6 @@ class TestInTimeOfDay(unittest.TestCase):
         self.location.date = datetime(2013, 03, 14, 9, 0, 0)
         self.pass_day_time = datetime(2013, 03, 14, 12, 0, 0)
         self.pass_night_time = datetime(2013, 03, 14, 0, 0, 0)
-        self.sun = ephem.Sun("2013/03/14")
         
     def test_pass_in_whatever_time(self):
         self.assertTrue(in_time_of_day(self.location, self.pass_day_time, "whatever"))
