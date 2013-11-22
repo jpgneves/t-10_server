@@ -154,4 +154,4 @@ doctest:
 
 .PHONY: test
 test:
-	@nosetests
+	@nosetests -v
