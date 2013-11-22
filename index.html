@@ -33,6 +33,12 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="http-routingtable.html" title="HTTP Routing Table"
+             >routing table</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
         <li><a href="#">T-10 API 0.1 documentation</a> &raquo;</li> 
       </ul>
     </div>  
@@ -49,6 +55,85 @@
 <ul class="simple">
 </ul>
 </div>
+</div>
+<div class="section" id="rest-api-documentation">
+<h1>REST API documentation<a class="headerlink" href="#rest-api-documentation" title="Permalink to this headline">¶</a></h1>
+<dl class="get">
+<dt id="get--location">
+<tt class="descname">GET </tt><tt class="descname">/location</tt><a class="headerlink" href="#get--location" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the current location of the ISS</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
+<li><strong>200</strong> &#8211; <p>A response object is returned as follows</p>
+<div class="highlight-js"><div class="highlight"><pre><span class="p">{</span>
+  <span class="s1">&#39;latitude&#39;</span><span class="o">:</span> <span class="nx">LAT</span><span class="p">,</span>
+  <span class="s1">&#39;longitude&#39;</span><span class="o">:</span> <span class="nx">LON</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-teeminus10_api">
+<span id="python-documentation"></span><h1>Python documentation<a class="headerlink" href="#module-teeminus10_api" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="module-teeminus10_helpers"></span><dl class="class">
+<dt id="teeminus10_helpers.T10ACSHelper">
+<em class="property">class </em><tt class="descclassname">teeminus10_helpers.</tt><tt class="descname">T10ACSHelper</tt><big>(</big><em>user</em>, <em>password</em>, <em>key</em><big>)</big><a class="headerlink" href="#teeminus10_helpers.T10ACSHelper" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles connections to Appcelerator Cloud Services and does push notifications</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="teeminus10_helpers.T10Helper">
+<em class="property">class </em><tt class="descclassname">teeminus10_helpers.</tt><tt class="descname">T10Helper</tt><big>(</big><em>acs</em>, <em>tz</em><big>)</big><a class="headerlink" href="#teeminus10_helpers.T10Helper" title="Permalink to this definition">¶</a></dt>
+<dd><p>&#8220;Server&#8221; for handling alerts, checking weather, what not.</p>
+<dl class="method">
+<dt id="teeminus10_helpers.T10Helper.alert_next_passes">
+<tt class="descname">alert_next_passes</tt><big>(</big><em>acc_cloud_cover</em>, <em>timeofday</em>, <em>device_id</em>, <em>count=10</em>, <em>city=''</em>, <em>coord=(0.0</em>, <em>0.0)</em><big>)</big><a class="headerlink" href="#teeminus10_helpers.T10Helper.alert_next_passes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets up alerts for up to the next 10 passes of the ISS over the given city or lat/lon.
+Alerts will be sent to the device that registered for them</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="teeminus10_helpers.T10Helper.get_cloud_cover">
+<tt class="descname">get_cloud_cover</tt><big>(</big><em>city</em><big>)</big><a class="headerlink" href="#teeminus10_helpers.T10Helper.get_cloud_cover" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets cloud cover in % for the given city</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="teeminus10_helpers.T10Helper.get_current_iss_location">
+<tt class="descname">get_current_iss_location</tt><big>(</big><big>)</big><a class="headerlink" href="#teeminus10_helpers.T10Helper.get_current_iss_location" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the current ISS location</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="teeminus10_helpers.T10Helper.get_next_passes">
+<tt class="descname">get_next_passes</tt><big>(</big><em>lat</em>, <em>lon</em>, <em>altitude</em>, <em>count</em>, <em>force_visible=False</em>, <em>time_of_day='either'</em><big>)</big><a class="headerlink" href="#teeminus10_helpers.T10Helper.get_next_passes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of the next visible passes for the ISS</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="teeminus10_helpers.T10TZHelper">
+<em class="property">class </em><tt class="descclassname">teeminus10_helpers.</tt><tt class="descname">T10TZHelper</tt><big>(</big><em>username</em><big>)</big><a class="headerlink" href="#teeminus10_helpers.T10TZHelper" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets timezone information</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="teeminus10_helpers.in_time_of_day">
+<tt class="descclassname">teeminus10_helpers.</tt><tt class="descname">in_time_of_day</tt><big>(</big><em>observer</em>, <em>pass_time</em>, <em>time_of_day</em><big>)</big><a class="headerlink" href="#teeminus10_helpers.in_time_of_day" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns sunset and sunrise times for the given Observer at date</p>
+</dd></dl>
+
 </div>
 <div class="section" id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
@@ -70,6 +155,8 @@
 <li><a class="reference internal" href="#">Welcome to T-10 API&#8217;s documentation!</a><ul>
 </ul>
 </li>
+<li><a class="reference internal" href="#rest-api-documentation">REST API documentation</a></li>
+<li><a class="reference internal" href="#module-teeminus10_api">Python documentation</a></li>
 <li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
 </ul>
 
@@ -101,6 +188,12 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              >index</a></li>
+        <li class="right" >
+          <a href="http-routingtable.html" title="HTTP Routing Table"
+             >routing table</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
         <li><a href="#">T-10 API 0.1 documentation</a> &raquo;</li> 
       </ul>
     </div>
