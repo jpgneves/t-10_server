@@ -4,6 +4,7 @@ import json
 import requests
 import requests_cache
 import threading
+import unittest
 from calendar import timegm
 from datetime import datetime, timedelta
 from math import degrees

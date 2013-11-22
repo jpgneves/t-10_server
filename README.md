@@ -1,6 +1,9 @@
 t-10_server
 ===========
 
+[![Build Status](https://travis-ci.org/jpgneves/t-10_server.png)](https://travis-ci.org/jpgneves/t-10_server)
+
+
 Server for the T-10 (T minus ten) #spaceapps 2013 project: http://spaceappschallenge.org/project/t-10/
 
 App code at https://github.com/stereoket/T-10
